@@ -3,6 +3,7 @@ package net.pixelbank.burntfighters.compat.burnt;
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.mojang.logging.LogUtils;
 
@@ -12,6 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.neoforged.fml.ModList;
@@ -71,6 +73,70 @@ public final class BurntExtinguish {
         DIRECT.put("burnt:smoldering_symmetric_sail", "burnt:burnt_symmetric_sail");
         DIRECT.put("burnt:smoldering_campfire", "burnt:burnt_campfire");
         DIRECT.put("burnt:ember_campfire", "burnt:burnt_campfire");
+    }
+
+    /** Blocks Burnt destroys outright rather than converting. */
+    private static final String LUMISENE = "supplementaries:lumisene";
+
+    /** Sentinel for "looked this block up, there is no conversion". */
+    private static final Block NO_CONVERSION = Blocks.AIR;
+
+    private static final Map<Block, Block> CONVERSIONS = new ConcurrentHashMap<>();
+
+    /**
+     * Burnt's cross-mod naming convention: a {@code smoldering_X} block
+     * extinguishes to {@code burnt_X} in the same namespace. Burnt applies this
+     * rule itself for Dynamic Trees branches, and it is how any future mod's
+     * burnt variants become extinguishable without code changes here.
+     */
+    private static final String SMOLDERING_PREFIX = "smoldering_";
+    private static final String BURNT_PREFIX = "burnt_";
+
+    /**
+     * Whether this mod can extinguish the block, independently of Burnt's tags.
+     *
+     * <p>Needed because several of Burnt's own burning blocks are in no fire
+     * tag at all — active fire barrels, envelopes, sails and ember campfires
+     * among them — so a tag-only check silently skips them.
+     */
+    public static boolean handles(BlockState state) {
+        return conversionFor(state) != null || destroys(state);
+    }
+
+    private static boolean destroys(BlockState state) {
+        return state.is(BurntFireConnector.IW_LEAF_PILES)
+                || BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(LUMISENE);
+    }
+
+    /** Resolved lazily and cached; the registry does not change at runtime. */
+    private static Block conversionFor(BlockState state) {
+        Block block = state.getBlock();
+        Block cached = CONVERSIONS.get(block);
+        if (cached != null)
+            return cached == NO_CONVERSION ? null : cached;
+
+        Block resolved = resolveConversion(block);
+        CONVERSIONS.put(block, resolved == null ? NO_CONVERSION : resolved);
+        return resolved;
+    }
+
+    private static Block resolveConversion(Block block) {
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+
+        String explicit = DIRECT.get(id.toString());
+        if (explicit != null)
+            return lookup(ResourceLocation.parse(explicit));
+
+        if (id.getPath().startsWith(SMOLDERING_PREFIX)) {
+            return lookup(ResourceLocation.fromNamespaceAndPath(
+                    id.getNamespace(), BURNT_PREFIX + id.getPath().substring(SMOLDERING_PREFIX.length())));
+        }
+        return null;
+    }
+
+    private static Block lookup(ResourceLocation id) {
+        Block block = BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+        return block == null || block == Blocks.AIR ? null : block;
     }
 
     private BurntExtinguish() {
@@ -150,18 +216,18 @@ public final class BurntExtinguish {
         }
     }
 
-    /** Applies a {@link #DIRECT} conversion, copying block properties across. */
+    /** Applies a conversion Burnt only performs inside its bulk routine. */
     private static boolean convertDirectly(Level level, BlockPos pos, BlockState before) {
-        String id = BuiltInRegistries.BLOCK.getKey(before.getBlock()).toString();
-        String target = DIRECT.get(id);
+        if (destroys(before)) {
+            level.destroyBlock(pos, false);
+            return true;
+        }
+
+        Block target = conversionFor(before);
         if (target == null)
             return false;
 
-        Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(target)).orElse(null);
-        if (block == null)
-            return false;
-
-        level.setBlock(pos, copyProperties(before, block.defaultBlockState()), 3);
+        level.setBlock(pos, copyProperties(before, target.defaultBlockState()), 3);
         return true;
     }
 

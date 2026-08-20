@@ -43,6 +43,9 @@ public final class BurntFireConnector {
     /** Soot deposits. Not fire, but water washes them off. */
     public static final TagKey<Block> SOOTY = tag("sooty");
 
+    /** Immersive Weathering leaf piles, which Burnt destroys rather than converts. */
+    public static final TagKey<Block> IW_LEAF_PILES = tag("iw_leaf_piles");
+
     /**
      * Every tag whose blocks a water spray should act on.
      *
@@ -95,9 +98,16 @@ public final class BurntFireConnector {
                 && isBurntFire(level.getBlockState(pos));
     }
 
-    /** Fire, plus soot that a spray should wash away. */
+    /**
+     * Fire, soot, and anything else we know how to put out.
+     *
+     * <p>The {@link BurntExtinguish#handles} arm is not redundant. Several of
+     * Burnt's own burning blocks are in no fire tag whatsoever — active fire
+     * barrels, envelopes, sails, ember campfires — so a tag-only test drops
+     * them silently.
+     */
     public static boolean isSprayTarget(BlockState state) {
-        return isBurntFire(state) || state.is(SOOTY);
+        return isBurntFire(state) || state.is(SOOTY) || BurntExtinguish.handles(state);
     }
 
     /**
