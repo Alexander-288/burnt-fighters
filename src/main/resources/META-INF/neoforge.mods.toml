@@ -11,6 +11,9 @@ issueTrackerURL = "https://github.com/Alexander-288/burnt-fighters/issues"
     credits = "Pixelbank, for Burnt Basic. Mikoalopex, for Create: FireFighting Additions."
     displayURL = "https://github.com/Alexander-288/burnt-fighters"
     logoFile = "logo.png"
+    # Server-side logic only: no rendering, no packets, no client state. Clients
+    # without this mod can join a server that has it.
+    displayTest = "IGNORE_ALL_VERSION"
     # Burnt is pixel art; without this NeoForge smooths the mod-list logo.
     logoBlur = false
     description = '''
