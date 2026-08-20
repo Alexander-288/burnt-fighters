@@ -1,0 +1,82 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.107'
+}
+
+group = mod_group_id
+version = mod_version
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+
+    maven {
+        name = "Modrinth"
+        url = uri("https://api.modrinth.com/maven")
+    }
+
+    maven {
+        name = "Create"
+        url = uri("https://maven.createmod.net")
+    }
+}
+
+neoForge {
+    version = neo_version
+
+    runs {
+        client {
+            client()
+        }
+
+        server {
+            server()
+        }
+    }
+
+    mods {
+        "$mod_id" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // Modrinth's maven addresses projects by opaque id, so each line is
+    // "project:version". Names are in the comments; keep them in sync.
+
+    // Create 6.0.10+mc1.21.1 — the spouting behaviour API we register against.
+    compileOnly "maven.modrinth:LNytGWDc:UjX6dr61"
+
+    // Burnt Basic 1.10.4.2 — reached purely by reflection and datapack tags at
+    // runtime, so nothing here compiles against it. Kept on the classpath for
+    // reference while working on the integration.
+    compileOnly "maven.modrinth:aclfPzta:gVPB2Kua"
+
+    // Create: FireFighting Additions 0.2.1-beta — not currently referenced.
+    // Needed again once the spray-device integration is rebuilt.
+    compileOnly "maven.modrinth:tlmPPRct:s0eGgxnc"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def expansions = [
+            mod_id     : mod_id,
+            mod_name   : mod_name,
+            mod_version: mod_version,
+    ]
+
+    inputs.properties(expansions)
+
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand(expansions)
+    }
+}

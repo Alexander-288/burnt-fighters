@@ -1,0 +1,41 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Eclipse / IntelliJ / VS Code
+bin/
+.settings/
+.classpath
+.project
+*.iml
+.idea/
+!.idea/gradle.xml
+!.idea/misc.xml
+!.idea/compiler.xml
+.vscode/
+.eclipse/
+
+# NeoForge dev run data
+run/
+runs/
+logs/
+
+# Local reference material: decompiled sources and jars of other people's mods.
+# Not ours to redistribute — keep it out of the repository.
+burnt-decompiled/
+external/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Scratch output from inspecting those mods
+burnt-inspection.txt
+create-*.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tooling caches
+.impeccable/
+.claude/
