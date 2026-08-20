@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.pixelbank.burntfighters.compat.burnt.BurntFireConnector;
+import net.pixelbank.burntfighters.compat.burnt.SuppressionAgent;
 
 /**
  * Lets a Create spout put out a Burnt fire directly beneath it.
@@ -16,17 +17,14 @@ import net.pixelbank.burntfighters.compat.burnt.BurntFireConnector;
  * already known to be burning by the time this runs — no scan needed to find
  * it.
  *
- * <p>Extinguishing goes through Burnt's full routine, which clears the
- * surrounding region rather than the single block. That is deliberate: a spout
- * fed with water is a fire-suppression machine, and the alternative single-block
- * routine cannot put out burning doors, campfires or sails at all. The cost
- * reflects the area cleared.
+ * <p>A spout runs water, so it puts out the block it is aimed at and nothing
+ * more. Foam is the agent that reaches into material.
  */
 public final class BurntFireSpoutingBehavior implements BlockSpoutingBehaviour {
     public static final BurntFireSpoutingBehavior INSTANCE = new BurntFireSpoutingBehavior();
 
-    /** Water consumed per successful extinguish, in millibuckets. */
-    private static final int COST = 1000;
+    /** Water consumed per block extinguished, in millibuckets. */
+    private static final int COST = 250;
 
     private BurntFireSpoutingBehavior() {
     }
@@ -43,10 +41,6 @@ public final class BurntFireSpoutingBehavior implements BlockSpoutingBehaviour {
         if (simulate)
             return COST;
 
-        // The procedure reports nothing about what it changed, so judge success
-        // by whether the block we were aimed at stopped burning.
-        var before = level.getBlockState(pos);
-        BurntFireConnector.extinguishAround(level, pos, true);
-        return level.getBlockState(pos).equals(before) ? 0 : COST;
+        return BurntFireConnector.extinguish(level, pos, SuppressionAgent.WATER) > 0 ? COST : 0;
     }
 }

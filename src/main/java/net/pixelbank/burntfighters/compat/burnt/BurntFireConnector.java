@@ -36,6 +36,10 @@ public final class BurntFireConnector {
     /** Structural blocks that are currently burning. */
     public static final TagKey<Block> ON_FIRE = tag("on_fire");
 
+    // Burnt routes these two through their own procedures, so they are named.
+    public static final TagKey<Block> BURNING_DOORS = tag("burning_doors");
+    public static final TagKey<Block> BURNING_TRAPDOORS = tag("burning_trapdoors");
+
     /** Soot deposits. Not fire, but water washes them off. */
     public static final TagKey<Block> SOOTY = tag("sooty");
 
@@ -66,8 +70,8 @@ public final class BurntFireConnector {
             tag("burning_slabs"),
             tag("burning_fences"),
             tag("burning_fence_gates"),
-            tag("burning_doors"),
-            tag("burning_trapdoors"),
+            BURNING_DOORS,
+            BURNING_TRAPDOORS,
             tag("burning_bamboo"),
             tag("burning_grass"),
             tag("burning_leaves"));
@@ -97,30 +101,17 @@ public final class BurntFireConnector {
     }
 
     /**
-     * Extinguishes the region around {@code pos} through Burnt's full rules.
+     * Extinguishes fire at {@code pos} using the given agent.
      *
-     * <p>Covers 216 blocks — see {@link BurntExtinguish#sweep}. Callers that
-     * run per block must dedupe on {@link BurntExtinguish#anchorFor}.
-     */
-    public static boolean extinguishAround(Level level, BlockPos pos, boolean showSpray) {
-        if (level == null || level.isClientSide || !level.isLoaded(pos))
-            return false;
-
-        return BurntExtinguish.sweep(level, pos, showSpray);
-    }
-
-    /**
-     * Extinguishes exactly one block, reporting whether it changed.
+     * <p>{@link SuppressionAgent#WATER} affects only the impact block;
+     * {@link SuppressionAgent#FOAM} soaks into the surrounding region.
      *
-     * <p>Bounded and precise, but backed by Burnt's incomplete single-block
-     * procedure. Use where the effect must not spill outside one position.
+     * @return how many blocks changed
      */
-    public static boolean extinguishExactly(Level level, BlockPos pos) {
+    public static int extinguish(Level level, BlockPos pos, SuppressionAgent agent) {
         if (level == null || level.isClientSide || !level.isLoaded(pos))
-            return false;
-        if (!isBurntFire(level.getBlockState(pos)))
-            return false;
+            return 0;
 
-        return BurntExtinguish.single(level, pos);
+        return BurntExtinguish.extinguishRegion(level, pos, agent.radius());
     }
 }

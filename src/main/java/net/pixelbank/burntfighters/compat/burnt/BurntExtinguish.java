@@ -1,163 +1,208 @@
 package net.pixelbank.burntfighters.compat.burnt;
 
 import java.lang.reflect.Method;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import com.mojang.logging.LogUtils;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.neoforged.fml.ModList;
 import org.slf4j.Logger;
 
 /**
  * Reflective bridge to Burnt's extinguish procedures.
  *
- * <p>Burnt keeps its conversion tables inside procedure classes rather than
- * behind an API, so reflection is the only way in without a hard dependency.
- * Going through them matters: they convert smoldering blocks back into their
- * burnt variants instead of deleting them, and they keep Burnt's world-level
+ * <p>Burnt exposes no API, so extinguishing means reflecting into its procedure
+ * classes. Delegating to them matters: they convert burning blocks back into
+ * their burnt variants rather than deleting them, and they keep the world-level
  * flame counter in sync.
  *
- * <p>Burnt has two entry points and picking the right one is the whole game:
+ * <h2>Why we dispatch per block instead of calling Burnt's bulk routine</h2>
  *
- * <ul>
- *   <li>{@code ExtinguishProcedure} — single block, and an incomplete subset.
- *       It is what Burnt's bare-hand extinguish uses. It does not know about
- *       doors, trapdoors, campfires, sails, fire barrels, crops, cave vines,
- *       envelopes or smoldering coal.
- *   <li>{@code ExtinguishBlockProcedure} — the complete one, and what Burnt's
- *       own extinguisher spray calls when its projectile hits a block. It
- *       dispatches to the door/trapdoor/bamboo sub-procedures and handles
- *       everything the first one misses.
- * </ul>
+ * Burnt's {@code ExtinguishBlockProcedure} is the complete routine, but it
+ * sweeps a fixed 6x6x6 region offset -3..+2 from the coordinate given. It takes
+ * no radius and no filter, so it cannot express either of the things this mod
+ * needs: a tunable radius, or a fluid that only reaches the surface.
  *
- * <p>We always want the second. Note that it is <em>not</em> a single-block
- * call: it sweeps a 6x6x6 region, offset -3..+2 on each axis from the
- * coordinate handed to it. Callers must rate-limit accordingly — see
- * {@link #SWEEP_SIZE} and {@link #anchorFor}.
+ * <p>So we drive Burnt's <em>single-block</em> procedures ourselves and control
+ * the region. {@code ExtinguishProcedure} covers most of it — the fire tag, all
+ * the burning_* tags, soot, and several smoldering blocks — and internally
+ * dispatches to Burnt's bamboo and sooty sub-procedures. Doors and trapdoors
+ * have their own procedures, called directly. The handful of blocks Burnt only
+ * converts inside the bulk routine are covered by {@link #DIRECT} below.
  */
 public final class BurntExtinguish {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final String MOD_ID = "burnt";
-    private static final String SWEEP_PROCEDURE =
-            "net.pixelbank.burnt.procedures.ExtinguishBlockProcedure";
-    private static final String SINGLE_PROCEDURE =
-            "net.pixelbank.burnt.procedures.ExtinguishProcedure";
-
-    /** Edge length of the region {@link #sweep} covers, offset -3..+2 from the anchor. */
-    public static final int SWEEP_SIZE = 6;
-
-    /**
-     * Grid step used to derive sweep anchors. Deliberately smaller than
-     * {@link #SWEEP_SIZE} so consecutive cells overlap and nothing falls
-     * between two sweeps.
-     */
-    private static final int ANCHOR_GRID = 4;
+    private static final String PROCEDURES = "net.pixelbank.burnt.procedures.";
 
     private static boolean initialised;
-    private static Method sweep;
     private static Method single;
+    private static Method door;
+    private static Method trapdoor;
+
+    /**
+     * Conversions Burnt performs only inside its bulk routine, which has no
+     * single-block entry point to call.
+     *
+     * <p>Mirrors {@code ExtinguishBlockProcedure}. If Burnt changes these, this
+     * table goes stale — everything else here delegates and cannot.
+     */
+    private static final Map<String, String> DIRECT = new LinkedHashMap<>();
+
+    static {
+        DIRECT.put("burnt:smoldering_coal", "minecraft:coal_block");
+        DIRECT.put("burnt:fire_barrel_active", "burnt:fire_barrel");
+        DIRECT.put("burnt:smoldering_crops", "burnt:burnt_crops");
+        DIRECT.put("burnt:smoldering_cave_vines", "burnt:burnt_cave_vines_plant");
+        DIRECT.put("burnt:smoldering_cave_vines_plant", "burnt:burnt_cave_vines_plant");
+        DIRECT.put("burnt:smoldering_envelope", "burnt:burnt_envelope");
+        DIRECT.put("burnt:smoldering_sail", "burnt:burnt_sail");
+        DIRECT.put("burnt:smoldering_sail_frame", "burnt:burnt_sail");
+        DIRECT.put("burnt:smoldering_symmetric_sail", "burnt:burnt_symmetric_sail");
+        DIRECT.put("burnt:smoldering_campfire", "burnt:burnt_campfire");
+        DIRECT.put("burnt:ember_campfire", "burnt:burnt_campfire");
+    }
 
     private BurntExtinguish() {
     }
 
     /**
-     * Snaps a position to the sweep grid.
+     * Extinguishes exactly one block.
      *
-     * <p>The sweep reaches -3..+2 from its anchor, so anchoring at
-     * {@code 4k + 1} covers {@code 4k - 2 .. 4k + 3} and therefore fully
-     * contains the grid cell {@code 4k .. 4k + 3}. Anchoring at {@code 4k}
-     * instead would leave {@code 4k + 3} uncovered.
-     *
-     * <p>Callers can use the anchor as a dedupe key: every position in a cell
-     * yields the same anchor, so one sweep per anchor per tick is enough.
+     * @return true if the block changed
      */
-    public static BlockPos anchorFor(BlockPos pos) {
-        return new BlockPos(
-                Math.floorDiv(pos.getX(), ANCHOR_GRID) * ANCHOR_GRID + 1,
-                Math.floorDiv(pos.getY(), ANCHOR_GRID) * ANCHOR_GRID + 1,
-                Math.floorDiv(pos.getZ(), ANCHOR_GRID) * ANCHOR_GRID + 1);
+    public static boolean extinguishOne(Level level, BlockPos pos) {
+        if (!init())
+            return false;
+
+        BlockState before = level.getBlockState(pos);
+        if (before.isAir())
+            return false;
+
+        Method procedure = procedureFor(before);
+        if (procedure != null && invoke(procedure, level, pos)) {
+            if (!level.getBlockState(pos).equals(before))
+                return true;
+        }
+
+        return convertDirectly(level, pos, before);
     }
 
     /**
-     * Runs Burnt's full extinguish over the region around {@code anchor}.
+     * Extinguishes every burning block within {@code radius} of {@code center},
+     * as a cube. Radius 0 touches only the centre block.
      *
-     * <p>This touches up to 216 blocks. Do not call it per sprayed block —
-     * derive an anchor with {@link #anchorFor} and call it once per anchor per
-     * tick.
-     *
-     * @param showSpray whether Burnt plays its splash effect at the anchor
-     * @return false only if the bridge is unavailable; the procedure reports
-     *         nothing about what it changed
+     * @return how many blocks changed
      */
-    public static boolean sweep(LevelAccessor level, BlockPos anchor, boolean showSpray) {
-        if (!init() || sweep == null)
-            return false;
+    public static int extinguishRegion(Level level, BlockPos center, int radius) {
+        if (!init())
+            return 0;
 
-        try {
-            sweep.invoke(null, level,
-                    (double) anchor.getX(), (double) anchor.getY(), (double) anchor.getZ(), showSpray);
-            return true;
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.error("Burnt's ExtinguishBlockProcedure threw; disabling the bridge", e);
-            sweep = null;
-            return false;
+        int changed = 0;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    pos.setWithOffset(center, dx, dy, dz);
+                    if (!level.isLoaded(pos))
+                        continue;
+                    if (!BurntFireConnector.isSprayTarget(level.getBlockState(pos)))
+                        continue;
+                    if (extinguishOne(level, pos.immutable()))
+                        changed++;
+                }
+            }
         }
-    }
 
-    /**
-     * Extinguishes exactly one block, and reports whether it changed.
-     *
-     * <p>Uses Burnt's single-block procedure, which is incomplete — see the
-     * class docs. Only worth it where a precise, bounded effect is wanted and
-     * the caller needs to know whether anything happened.
-     */
-    public static boolean single(LevelAccessor level, BlockPos pos) {
-        if (!init() || single == null)
-            return false;
-
-        var before = level.getBlockState(pos);
-        try {
-            single.invoke(null, level, (double) pos.getX(), (double) pos.getY(), (double) pos.getZ());
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.error("Burnt's ExtinguishProcedure threw; disabling the bridge", e);
-            single = null;
-            return false;
-        }
-        return !level.getBlockState(pos).equals(before);
+        return changed;
     }
 
     public static boolean isAvailable() {
-        return init() && sweep != null;
+        return init() && single != null;
+    }
+
+    private static Method procedureFor(BlockState state) {
+        if (door != null && state.is(BurntFireConnector.BURNING_DOORS))
+            return door;
+        if (trapdoor != null && state.is(BurntFireConnector.BURNING_TRAPDOORS))
+            return trapdoor;
+        return single;
+    }
+
+    private static boolean invoke(Method procedure, LevelAccessor level, BlockPos pos) {
+        try {
+            procedure.invoke(null, level, (double) pos.getX(), (double) pos.getY(), (double) pos.getZ());
+            return true;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            LOGGER.error("Burnt's {} threw at {}", procedure.getDeclaringClass().getSimpleName(), pos, e);
+            return false;
+        }
+    }
+
+    /** Applies a {@link #DIRECT} conversion, copying block properties across. */
+    private static boolean convertDirectly(Level level, BlockPos pos, BlockState before) {
+        String id = BuiltInRegistries.BLOCK.getKey(before.getBlock()).toString();
+        String target = DIRECT.get(id);
+        if (target == null)
+            return false;
+
+        Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(target)).orElse(null);
+        if (block == null)
+            return false;
+
+        level.setBlock(pos, copyProperties(before, block.defaultBlockState()), 3);
+        return true;
+    }
+
+    private static BlockState copyProperties(BlockState from, BlockState to) {
+        BlockState result = to;
+        for (Property<?> property : from.getProperties()) {
+            if (result.hasProperty(property))
+                result = copyProperty(from, result, property);
+        }
+        return result;
+    }
+
+    private static <T extends Comparable<T>> BlockState copyProperty(
+            BlockState from, BlockState to, Property<T> property) {
+        return to.setValue(property, from.getValue(property));
     }
 
     private static synchronized boolean init() {
         if (initialised)
-            return sweep != null || single != null;
+            return single != null;
 
         initialised = true;
         if (!ModList.get().isLoaded(MOD_ID))
             return false;
 
-        sweep = bind(SWEEP_PROCEDURE, LevelAccessor.class,
-                double.class, double.class, double.class, boolean.class);
-        single = bind(SINGLE_PROCEDURE, LevelAccessor.class,
-                double.class, double.class, double.class);
+        single = bind("ExtinguishProcedure");
+        door = bind("DoorExtinguishProcedure");
+        trapdoor = bind("TrapdoorExtinguishProcedure");
 
-        if (sweep == null) {
-            LOGGER.warn("Burnt is present but {} could not be bound. Falling back to the incomplete "
-                    + "single-block procedure; burning doors, campfires and sails will not extinguish.",
-                    SWEEP_PROCEDURE);
-        }
-        return sweep != null || single != null;
+        if (single == null)
+            LOGGER.warn("Burnt is present but its extinguish procedures could not be bound; "
+                    + "Burnt fires will not be extinguished");
+        return single != null;
     }
 
-    private static Method bind(String owner, Class<?>... signature) {
+    private static Method bind(String name) {
         try {
-            return Class.forName(owner).getMethod("execute", signature);
+            return Class.forName(PROCEDURES + name).getMethod(
+                    "execute", LevelAccessor.class, double.class, double.class, double.class);
         } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.debug("Could not bind {}#execute", owner, e);
+            LOGGER.debug("Could not bind {}{}#execute", PROCEDURES, name, e);
             return null;
         }
     }
