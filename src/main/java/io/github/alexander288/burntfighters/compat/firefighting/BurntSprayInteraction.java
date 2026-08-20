@@ -1,11 +1,11 @@
-package net.pixelbank.burntfighters.compat.firefighting;
+package io.github.alexander288.burntfighters.compat.firefighting;
 
 import com.mikoalopex.createfirefightingadd.api.nozzle.NozzleSprayBlockInteraction;
 import com.mikoalopex.createfirefightingadd.api.nozzle.NozzleSprayHitContext;
 
 import net.minecraft.world.level.Level;
-import net.pixelbank.burntfighters.compat.burnt.BurntFireConnector;
-import net.pixelbank.burntfighters.compat.burnt.SuppressionAgent;
+import io.github.alexander288.burntfighters.compat.burnt.BurntFireConnector;
+import io.github.alexander288.burntfighters.compat.burnt.SuppressionAgent;
 
 /**
  * Puts Burnt fires out when a Create: FireFighting Additions nozzle sprays them.

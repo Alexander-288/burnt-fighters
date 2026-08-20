@@ -1,4 +1,4 @@
-package net.pixelbank.burntfighters.compat.firefighting;
+package io.github.alexander288.burntfighters.compat.firefighting;
 
 import com.mikoalopex.createfirefightingadd.api.nozzle.NozzleSprayInteractionRegistry;
 

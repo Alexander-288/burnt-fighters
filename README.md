@@ -82,6 +82,19 @@ project root are decompiled sources and inspection dumps of other authors' mods,
 kept locally for reference. They are gitignored deliberately — Burnt Basic is
 All Rights Reserved and is not ours to redistribute.
 
+## Credits
+
+- **Pixelbank** — [Burnt Basic](https://modrinth.com/mod/burnt-basic)
+- **Mikoalopex** — [Create: FireFighting Additions](https://modrinth.com/mod/create-firefighting-additions)
+
+This is an unofficial addon. It is not affiliated with, endorsed by, or
+supported by the authors of any of the mods it integrates with.
+
 ## License
 
-MIT
+MIT, covering this repository only — see [LICENSE](LICENSE). The mods this
+integrates with are the work of their respective authors; none of them are
+bundled here.
+
+The mod currently ships no assets. If that changes, the licence for those will
+be stated separately.

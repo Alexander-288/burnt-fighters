@@ -1,11 +1,11 @@
-package net.pixelbank.burntfighters.compat.create;
+package io.github.alexander288.burntfighters.compat.create;
 
 import com.simibubi.create.api.behaviour.spouting.BlockSpoutingBehaviour;
 import com.simibubi.create.api.registry.SimpleRegistry;
 
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
-import net.pixelbank.burntfighters.compat.burnt.BurntFireConnector;
+import io.github.alexander288.burntfighters.compat.burnt.BurntFireConnector;
 
 /**
  * Wires this mod's behaviours into Create's registries.

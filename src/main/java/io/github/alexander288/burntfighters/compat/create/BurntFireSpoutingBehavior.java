@@ -1,4 +1,4 @@
-package net.pixelbank.burntfighters.compat.create;
+package io.github.alexander288.burntfighters.compat.create;
 
 import com.simibubi.create.api.behaviour.spouting.BlockSpoutingBehaviour;
 import com.simibubi.create.content.fluids.spout.SpoutBlockEntity;
@@ -7,8 +7,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.pixelbank.burntfighters.compat.burnt.BurntFireConnector;
-import net.pixelbank.burntfighters.compat.burnt.SuppressionAgent;
+import io.github.alexander288.burntfighters.compat.burnt.BurntFireConnector;
+import io.github.alexander288.burntfighters.compat.burnt.SuppressionAgent;
 
 /**
  * Lets a Create spout put out a Burnt fire directly beneath it.

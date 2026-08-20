@@ -1,4 +1,4 @@
-package net.pixelbank.burntfighters.compat.burnt;
+package io.github.alexander288.burntfighters.compat.burnt;
 
 /**
  * What a given fluid can do to a fire.

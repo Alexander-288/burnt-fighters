@@ -1,11 +1,11 @@
-package net.pixelbank.burntfighters;
+package io.github.alexander288.burntfighters;
 
 import com.mojang.logging.LogUtils;
 
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
-import net.pixelbank.burntfighters.compat.create.CreateCompat;
-import net.pixelbank.burntfighters.compat.firefighting.FireFightingCompat;
+import io.github.alexander288.burntfighters.compat.create.CreateCompat;
+import io.github.alexander288.burntfighters.compat.firefighting.FireFightingCompat;
 import org.slf4j.Logger;
 
 @Mod(BurntFighters.MOD_ID)
