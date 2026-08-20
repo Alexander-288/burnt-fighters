@@ -1,88 +1,94 @@
 # Store listing copy
 
-Paste-ready text for CurseForge and Modrinth. Keep in sync with the README.
+Paste-ready for CurseForge and Modrinth. Both render Markdown.
 
 ---
 
-## Summary / short description
+## Summary (185 chars)
 
-> Makes Create and Create: FireFighting Additions actually put out Burnt Basic
-> fires — including the burning doors, campfires, sails and fire barrels that
-> currently ignore water entirely.
-
-CurseForge caps the summary around 255 characters; Modrinth around 256. The
-above fits both.
+Makes Create and Create: FireFighting Additions actually put out Burnt Basic fires — including the burning doors, campfires, sails and fire barrels that currently ignore water completely.
 
 ---
 
 ## Full description
 
-### What it does
+# Burnt Fighters
 
-Burnt Basic adds a fire that spreads through your build. Create and Create:
-FireFighting Additions add machinery to fight fires. They do not fully
-understand each other. This mod is the bridge.
+**Burnt Basic** sets your world on fire. **Create** and **Create: FireFighting
+Additions** give you the machinery to fight it.
 
-**Create** — a spout running water extinguishes a Burnt fire beneath it,
-250 mB per block.
+They don't fully understand each other. Point a nozzle at a burning door and
+nothing happens. This mod is the missing bridge.
 
-**Create: FireFighting Additions** — nozzles now extinguish Burnt fires that
-previously did nothing at all when sprayed:
+## What it fixes
 
-- burning doors and trapdoors
-- burning and ember campfires
-- sails and sail frames
-- lit fire barrels, which defuse back to an inert barrel
-- crops, cave vines and envelopes
-- smoldering coal, which recovers to a full coal block
-- bamboo and leaf piles
-- soot, washed off by water
+Spray these with a FireFighting Additions nozzle and, right now, nothing happens
+at all. With Burnt Fighters installed, they go out:
 
-### Why those did not work
+- Burning **doors** and **trapdoors**
+- Burning and ember **campfires**
+- **Sails** and sail frames
+- Lit **fire barrels** — defused back to an inert barrel before they go off
+- **Crops**, **cave vines** and **envelopes**
+- **Smoldering coal** — recovers to a full coal block
+- **Bamboo** and **leaf piles**
+- **Soot**, washed clean by water
 
-FireFighting Additions ships its own Burnt bridge, but it calls Burnt's
-`ExtinguishProcedure` — the reduced, single-block routine behind bare-hand
-extinguishing. Burnt's own extinguisher spray calls `ExtinguishBlockProcedure`,
-which handles considerably more. Everything in the list above is in the gap
-between the two.
+It also adds **Create spout** support: a spout running water puts out a Burnt
+fire beneath it for 250 mB, so you can build automated suppression.
 
-This mod dispatches to the correct procedure for each block type.
+## Why they didn't work
 
-### Nothing gets deleted
+FireFighting Additions already ships a Burnt bridge — but it calls Burnt's
+single-block extinguish routine, the one behind putting fires out by hand.
+Burnt's own extinguisher spray calls a different, much more complete routine.
+Everything in that list above falls into the gap between the two.
 
-Burnt's `on_fire` tag is not a tag of flames — it contains structural blocks
-that happen to be burning. Extinguishing them by removing them would delete the
-burning parts of your build.
+Burnt Fighters routes each block to the right routine.
 
-Every conversion here goes through Burnt's own routines, so burning blocks turn
-into their burnt variants with properties preserved, and Burnt's world-level
-flame counter stays in sync.
+## Your build survives
 
-### Water is surface-only
+Burnt's "on fire" blocks aren't flames — they're *your walls, doors and beams,
+currently alight*. Putting them out by deleting them would take your house with
+them.
 
-Water extinguishes the block a spray lands on, not blocks behind it. Nothing is
-lost by this — FireFighting Additions' rays stop at the first solid block
-regardless, so deeper blocks were never reachable.
+Every conversion here goes through Burnt's own logic, so burning blocks become
+their burnt variants with orientation and state preserved, and Burnt's internal
+fire tracking stays consistent. Nothing is ever destroyed to extinguish it.
 
-A foam fluid that soaks into material is planned.
+## Water reaches the surface
 
-### Compatibility
+Water puts out what the spray actually lands on, not blocks hidden behind it.
+Nothing is lost by this — nozzle spray already stops at the first solid block.
 
-- Works inside Sable sublevels. Nothing here depends on level identity.
-- Server-side only. Clients do not need it installed to join.
-- Burnt variants added by other mods are picked up automatically when they
-  follow Burnt's `smoldering_X` to `burnt_X` naming convention.
+A **foam** fluid that soaks deeper into burning material is planned.
 
-### Requirements
+## Compatibility
 
-- **Burnt Basic** — required
-- **Create** — optional, enables the spout integration
-- **Create: FireFighting Additions** — optional, enables the nozzle integration
+- **Server-side only.** Clients don't need it installed to join a server.
+- **Works inside Sable sublevels**, so airships and moving contraptions are fine.
+- **Other mods' burnt variants** are picked up automatically when they follow
+  Burnt's `smoldering_X` → `burnt_X` naming.
 
-Unofficial. Not affiliated with or endorsed by the authors of any mod it
+## Requirements
+
+| Mod | |
+|---|---|
+| Burnt Basic | **Required** |
+| Create | Optional — enables spout support |
+| Create: FireFighting Additions | Optional — enables nozzle support |
+
+You get whichever integrations you have mods for.
+
+---
+
+Unofficial. Not affiliated with or endorsed by the authors of the mods it
 integrates with.
 
-Source: https://github.com/Alexander-288/burnt-fighters (MIT)
+Credit to **Pixelbank** for Burnt Basic and **Mikoalopex** for Create:
+FireFighting Additions.
+
+Source (MIT): https://github.com/Alexander-288/burnt-fighters
 
 ---
 
@@ -95,22 +101,17 @@ Source: https://github.com/Alexander-288/burnt-fighters (MIT)
 | Category | Addons (secondary: Technology) |
 | Mod loader | NeoForge |
 | Game version | 1.21.1 |
-| License | Custom — link to the repo LICENSE |
+| License | Custom — link the repo LICENSE |
 
-Relationships:
-
-| Project | Type |
-|---|---|
-| Burnt Basic | Required dependency |
-| Create | Optional dependency |
-| Create: FireFighting Additions | Optional dependency |
+Relationships: Burnt Basic = Required Dependency. Create = Optional Dependency.
+Create: FireFighting Additions = Optional Dependency.
 
 ### Modrinth
 
 | Field | Value |
 |---|---|
-| Environment — client | Optional |
-| Environment — server | Required |
+| Environment — client | **Optional** |
+| Environment — server | **Required** |
 | License | MIT |
 | Categories | Utility, Technology |
 | Loader | NeoForge |
@@ -118,6 +119,5 @@ Relationships:
 
 Dependencies: same three, same types.
 
-The client/server split matters. This mod is pure server-side logic, and
-marking it client-required makes it look wrongly incompatible to modpack
-tooling.
+The client/server split matters — marking this client-required makes it look
+wrongly incompatible to modpack tooling.
