@@ -1,5 +1,7 @@
 package net.pixelbank.burntfighters.compat.burnt;
 
+import java.util.List;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -9,28 +11,78 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Everything this mod knows about Burnt's fire blocks.
+ * Everything this mod knows about Burnt's burning blocks.
  *
  * <p>The tags come from Burnt's own datapack, so they resolve to nothing when
  * Burnt is absent and every query here answers false.
+ *
+ * <p>Recognition is done purely by tag. Create: FireFighting Additions' own
+ * bridge additionally guesses from the block's registry path — matching
+ * anything containing "fire", "flame", "burning" or "smoldering" — which
+ * false-positives on unrelated blocks from other mods (coral, campfires,
+ * decorative braziers) and then pays for a reflective call that does nothing.
  */
 public final class BurntFireConnector {
-    /** Flames proper, plus smoldering crops and vines. */
-    public static final TagKey<Block> FIRE = tag("fire");
-    /** Structural blocks that are currently burning: logs, doors, stairs, leaves. */
-    public static final TagKey<Block> ON_FIRE = tag("on_fire");
-    /** Spreading flames only. */
-    public static final TagKey<Block> ACTIVE_FIRE = tag("active_fire");
-
     private BurntFireConnector() {
     }
+
+    // Flames proper.
+    public static final TagKey<Block> FIRE = tag("fire");
+    public static final TagKey<Block> ACTIVE_FIRE = tag("active_fire");
+    public static final TagKey<Block> WOOD_FIRE = tag("wood_fire");
+    public static final TagKey<Block> COPPER_FIRE = tag("copper_fire");
+    public static final TagKey<Block> TALL_FLAMES = tag("tall_flames");
+
+    /** Structural blocks that are currently burning. */
+    public static final TagKey<Block> ON_FIRE = tag("on_fire");
+
+    /** Soot deposits. Not fire, but water washes them off. */
+    public static final TagKey<Block> SOOTY = tag("sooty");
+
+    /**
+     * Every tag whose blocks a water spray should act on.
+     *
+     * <p>The burning_* set is listed explicitly rather than relying on
+     * {@code on_fire} alone: doors, trapdoors, bamboo, grass and leaves each
+     * live in their own tag and are the exact cases FFA's bridge silently
+     * fails to extinguish.
+     */
+    public static final List<TagKey<Block>> FIRE_TAGS = List.of(
+            FIRE,
+            ACTIVE_FIRE,
+            ON_FIRE,
+            WOOD_FIRE,
+            COPPER_FIRE,
+            TALL_FLAMES,
+            tag("smoldering_leaves"),
+            tag("smoldering_logs"),
+            tag("smoldering_planks"),
+            tag("burning_logs"),
+            tag("burning_wood"),
+            tag("burning_stripped_logs"),
+            tag("burning_stripped_wood"),
+            tag("burning_planks"),
+            tag("burning_stairs"),
+            tag("burning_slabs"),
+            tag("burning_fences"),
+            tag("burning_fence_gates"),
+            tag("burning_doors"),
+            tag("burning_trapdoors"),
+            tag("burning_bamboo"),
+            tag("burning_grass"),
+            tag("burning_leaves"));
 
     private static TagKey<Block> tag(String path) {
         return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("burnt", path));
     }
 
+    /** True if the block is burning in some form Burnt understands. */
     public static boolean isBurntFire(BlockState state) {
-        return state.is(FIRE) || state.is(ON_FIRE) || state.is(ACTIVE_FIRE);
+        for (TagKey<Block> tag : FIRE_TAGS) {
+            if (state.is(tag))
+                return true;
+        }
+        return false;
     }
 
     public static boolean isBurntFire(Level level, BlockPos pos) {
@@ -39,47 +91,36 @@ public final class BurntFireConnector {
                 && isBurntFire(level.getBlockState(pos));
     }
 
+    /** Fire, plus soot that a spray should wash away. */
+    public static boolean isSprayTarget(BlockState state) {
+        return isBurntFire(state) || state.is(SOOTY);
+    }
+
     /**
-     * Extinguishes a single block through Burnt's own rules.
+     * Extinguishes the region around {@code pos} through Burnt's full rules.
      *
-     * @return true if the block actually changed
+     * <p>Covers 216 blocks — see {@link BurntExtinguish#sweep}. Callers that
+     * run per block must dedupe on {@link BurntExtinguish#anchorFor}.
      */
-    public static boolean extinguish(Level level, BlockPos pos) {
+    public static boolean extinguishAround(Level level, BlockPos pos, boolean showSpray) {
+        if (level == null || level.isClientSide || !level.isLoaded(pos))
+            return false;
+
+        return BurntExtinguish.sweep(level, pos, showSpray);
+    }
+
+    /**
+     * Extinguishes exactly one block, reporting whether it changed.
+     *
+     * <p>Bounded and precise, but backed by Burnt's incomplete single-block
+     * procedure. Use where the effect must not spill outside one position.
+     */
+    public static boolean extinguishExactly(Level level, BlockPos pos) {
         if (level == null || level.isClientSide || !level.isLoaded(pos))
             return false;
         if (!isBurntFire(level.getBlockState(pos)))
             return false;
 
-        return BurntExtinguishProcedure.executeAt(level, pos);
-    }
-
-    /**
-     * Extinguishes every Burnt fire in the cube of the given radius around
-     * {@code center}.
-     *
-     * @return how many blocks changed
-     */
-    public static int extinguishArea(Level level, BlockPos center, int radius) {
-        if (level == null || level.isClientSide || !level.isLoaded(center))
-            return 0;
-
-        int changed = 0;
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -radius; dy <= radius; dy++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    pos.setWithOffset(center, dx, dy, dz);
-                    if (!level.isLoaded(pos))
-                        continue;
-                    if (!isBurntFire(level.getBlockState(pos)))
-                        continue;
-                    if (BurntExtinguishProcedure.executeAt(level, pos))
-                        changed++;
-                }
-            }
-        }
-
-        return changed;
+        return BurntExtinguish.single(level, pos);
     }
 }

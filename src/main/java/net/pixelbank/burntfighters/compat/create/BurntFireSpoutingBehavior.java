@@ -13,13 +13,20 @@ import net.pixelbank.burntfighters.compat.burnt.BurntFireConnector;
  * Lets a Create spout put out a Burnt fire directly beneath it.
  *
  * <p>Registered against Burnt's fire tags, so the block at {@code pos} is
- * already known to be a fire block by the time this runs — no area scan needed.
+ * already known to be burning by the time this runs — no scan needed to find
+ * it.
+ *
+ * <p>Extinguishing goes through Burnt's full routine, which clears the
+ * surrounding region rather than the single block. That is deliberate: a spout
+ * fed with water is a fire-suppression machine, and the alternative single-block
+ * routine cannot put out burning doors, campfires or sails at all. The cost
+ * reflects the area cleared.
  */
 public final class BurntFireSpoutingBehavior implements BlockSpoutingBehaviour {
     public static final BurntFireSpoutingBehavior INSTANCE = new BurntFireSpoutingBehavior();
 
-    /** Water consumed per block extinguished, in millibuckets. */
-    private static final int COST_PER_BLOCK = 250;
+    /** Water consumed per successful extinguish, in millibuckets. */
+    private static final int COST = 1000;
 
     private BurntFireSpoutingBehavior() {
     }
@@ -28,14 +35,18 @@ public final class BurntFireSpoutingBehavior implements BlockSpoutingBehaviour {
     public int fillBlock(Level level, BlockPos pos, SpoutBlockEntity spout, FluidStack fluid, boolean simulate) {
         if (fluid.isEmpty() || !fluid.getFluid().isSame(Fluids.WATER))
             return 0;
-        if (fluid.getAmount() < COST_PER_BLOCK)
+        if (fluid.getAmount() < COST)
             return 0;
         if (!BurntFireConnector.isBurntFire(level, pos))
             return 0;
 
         if (simulate)
-            return COST_PER_BLOCK;
+            return COST;
 
-        return BurntFireConnector.extinguish(level, pos) ? COST_PER_BLOCK : 0;
+        // The procedure reports nothing about what it changed, so judge success
+        // by whether the block we were aimed at stopped burning.
+        var before = level.getBlockState(pos);
+        BurntFireConnector.extinguishAround(level, pos, true);
+        return level.getBlockState(pos).equals(before) ? 0 : COST;
     }
 }

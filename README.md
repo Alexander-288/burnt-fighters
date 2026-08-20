@@ -1,30 +1,71 @@
 # Burnt Fighters
 
 A NeoForge 1.21.1 compatibility mod that lets [Create](https://modrinth.com/mod/create)'s
-fluid machinery fight fires from [Burnt Basic](https://modrinth.com/mod/burnt-basic).
+fluid machinery — and [Create: FireFighting Additions](https://modrinth.com/mod/create-firefighting-additions)'
+nozzles — actually put out fires from [Burnt Basic](https://modrinth.com/mod/burnt-basic).
 
-Both dependencies are optional. With neither installed the mod is inert.
+Every dependency is optional. With none of them installed the mod is inert.
 
-## What it currently does
+## What it does
 
-A Create **spout** loaded with water extinguishes a Burnt fire directly beneath
-it, consuming 250 mB per block.
+- **Create spout** loaded with water extinguishes a Burnt fire beneath it.
+- **FireFighting Additions nozzles** extinguish Burnt fires anywhere in the
+  spray cone, including the many block types their built-in bridge misses.
 
-## How extinguishing works
+## The two extinguish procedures
 
-Burnt's fire is not just flame blocks. Its `burnt:on_fire` tag contains
-*structural blocks that are burning* — smoldering doors, stairs, logs, leaves —
-and its `burnt:fire` tag contains smoldering crops and vines.
+Burnt exposes no API, so extinguishing means reflecting into its procedure
+classes. There are two, and picking the right one is the whole problem:
 
-Those must not simply be removed. Burnt's own `ExtinguishProcedure` converts
-them back into their burnt variants (`smoldering_hay` → `burnt_hay`, and so on)
-and decrements the world-level flame counter that drives Burnt's fire spread.
-Deleting the blocks instead would destroy player builds and permanently desync
-that counter.
+| | `ExtinguishProcedure` | `ExtinguishBlockProcedure` |
+|---|---|---|
+| Scope | one block | sweeps 6×6×6, offset −3..+2 |
+| Used by | Burnt's bare-hand extinguish | Burnt's own extinguisher spray |
+| Doors, trapdoors | ✗ | ✓ |
+| Campfires (burnt, ember) | ✗ | ✓ |
+| Sails, sail frames | ✗ | ✓ |
+| Fire barrels | ✗ | ✓ |
+| Crops, cave vines, envelopes | ✗ | ✓ |
+| Smoldering coal | ✗ | ✓ |
+| Bamboo, leaf piles, DT branches | ✗ | ✓ |
 
-So `BurntExtinguishProcedure` reflects into Burnt's procedure rather than
-touching blocks itself, and every extinguish path in this mod goes through it.
-No Burnt, no procedure, no effect.
+The first is a strict subset of the second. FireFighting Additions' own
+`integration/burnt/BurntCompat` calls the first one, which is why spraying a
+burning door, campfire or sail with a nozzle does nothing at all. This mod
+calls the second — the same one Burnt's own extinguisher projectile uses on
+block hit.
+
+Note also that the correct procedure is **not** a single-block call. It sweeps
+216 blocks per invocation, so callers must rate-limit; see below.
+
+## Why not just delete the fire blocks?
+
+Burnt's `burnt:on_fire` tag is not a tag of flames. It contains *structural
+blocks that are burning* — smoldering doors, stairs, logs, leaves — and
+`burnt:fire` contains smoldering crops and vines.
+
+Removing those would delete the player's burning house rather than extinguish
+it. Burnt's procedures instead convert each one back to its burnt variant
+(`smoldering_hay` → `burnt_hay`, and so on) and decrement the world-level flame
+counter that drives Burnt's fire spread. Nothing in this mod touches blocks
+directly.
+
+## Integration approach
+
+FireFighting Additions exposes a real extension point —
+`api.nozzle.NozzleSprayInteractionRegistry` — which is notified for every block
+a spray sample reaches, before its own extinguish pass runs. This mod registers
+a callback there. No mixin, no coremodding, nothing that breaks when that mod
+updates.
+
+The callback is documented as additive and cannot cancel built-in effects,
+which is fine: it runs first, so by the time FFA's own bridge examines the
+block we have already converted it and its call is a no-op.
+
+Because the correct procedure sweeps 216 blocks and a nozzle reports hundreds
+of blocks per tick, each hit is snapped to a coarse grid (`BurntExtinguish.anchorFor`)
+and at most one sweep runs per grid cell per tick. The grid step is smaller than
+the sweep extent so cells overlap and nothing falls between two sweeps.
 
 ## Building
 
@@ -40,14 +81,6 @@ Output lands in `build/libs/`.
 project root are decompiled sources and inspection dumps of other authors' mods,
 kept locally for reference. They are gitignored deliberately — Burnt Basic is
 All Rights Reserved and is not ours to redistribute.
-
-## Status
-
-The integration with
-[Create: FireFighting Additions](https://modrinth.com/mod/create-firefighting-additions)
-is being rebuilt. Note that mod already ships its own Burnt bridge
-(`integration/burnt/BurntCompat`), which calls the same `ExtinguishProcedure`,
-so any future work here needs to complement it rather than pre-empt it.
 
 ## License
 

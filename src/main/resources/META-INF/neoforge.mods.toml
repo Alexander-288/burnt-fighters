@@ -30,7 +30,7 @@ water puts out a Burnt fire the same way Burnt itself would.
     side = "BOTH"
 
 # --- Optional ---------------------------------------------------------------
-# Nothing here is required: with neither mod present this mod is inert. Both
+# Nothing here is required: with none of these present this mod is inert. All
 # are ordered AFTER so their registries and tags exist before we touch them.
 
 [[dependencies.${mod_id}]]
@@ -44,5 +44,12 @@ water puts out a Burnt fire the same way Burnt itself would.
     modId = "create"
     type = "optional"
     versionRange = "[6.0,)"
+    ordering = "AFTER"
+    side = "BOTH"
+
+[[dependencies.${mod_id}]]
+    modId = "createfirefightingadd"
+    type = "optional"
+    versionRange = "[0.2.1-beta,)"
     ordering = "AFTER"
     side = "BOTH"
