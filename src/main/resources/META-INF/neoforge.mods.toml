@@ -10,6 +10,9 @@ issueTrackerURL = "https://github.com/Alexander-288/burnt-fighters/issues"
     authors = "Static (alexander-288)"
     credits = "Pixelbank, for Burnt Basic. Mikoalopex, for Create: FireFighting Additions."
     displayURL = "https://github.com/Alexander-288/burnt-fighters"
+    logoFile = "logo.png"
+    # Burnt is pixel art; without this NeoForge smooths the mod-list logo.
+    logoBlur = false
     description = '''
 Bridges Burnt Basic's fire into Create's fluid machinery, so a spout full of
 water puts out a Burnt fire the same way Burnt itself would.
@@ -31,16 +34,19 @@ water puts out a Burnt fire the same way Burnt itself would.
     ordering = "NONE"
     side = "BOTH"
 
-# --- Optional ---------------------------------------------------------------
-# Nothing here is required: with none of these present this mod is inert. All
-# are ordered AFTER so their registries and tags exist before we touch them.
-
+# Burnt is required, not optional: every code path here delegates to Burnt's
+# extinguish procedures, so without it the mod does nothing at all. A hard
+# dependency gives a clear loader error instead of a silent no-op.
 [[dependencies.${mod_id}]]
     modId = "burnt"
-    type = "optional"
+    type = "required"
     versionRange = "[1.10,)"
     ordering = "AFTER"
     side = "BOTH"
+
+# --- Optional ---------------------------------------------------------------
+# One integration each. Ordered AFTER so their registries exist before we
+# touch them; absent, the matching compat class is never loaded.
 
 [[dependencies.${mod_id}]]
     modId = "create"

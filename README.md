@@ -4,7 +4,9 @@ A NeoForge 1.21.1 compatibility mod that lets [Create](https://modrinth.com/mod/
 fluid machinery — and [Create: FireFighting Additions](https://modrinth.com/mod/create-firefighting-additions)'
 nozzles — actually put out fires from [Burnt Basic](https://modrinth.com/mod/burnt-basic).
 
-Every dependency is optional. With none of them installed the mod is inert.
+**Burnt Basic is required** — every code path here delegates to its extinguish
+procedures. Create and Create: FireFighting Additions are each optional; you get
+whichever integrations you have mods for.
 
 ## What it does
 
